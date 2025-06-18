@@ -35,6 +35,14 @@
 npm install
 ```
 
+### 配置DeepSeek API（可选）
+1. 在项目根目录创建 `.env` 文件
+2. 添加以下配置：
+```env
+VITE_DEEPSEEK_API_KEY=your-deepseek-api-key-here
+VITE_DEEPSEEK_API_ENDPOINT=https://api.deepseek.com/v1/chat/completions
+```
+
 ### 启动开发服务器
 ```bash
 npm run dev
@@ -81,6 +89,7 @@ npm run build
 - **日历组件**：FullCalendar
 - **时间处理**：dayjs
 - **构建工具**：Vite + TypeScript
+- **AI集成**：DeepSeek API
 
 ## 📱 自然语言输入示例
 
@@ -97,6 +106,25 @@ npm run build
 - 🟡 **中优先级**：一般重要的任务  
 - 🔵 **低优先级**：不紧急的任务
 - 🤖 **AI安排**：由智能Agent自动安排的任务
+
+## 🔧 API配置
+
+### DeepSeek API配置
+项目支持DeepSeek API进行自然语言解析。如果未配置API，系统会自动回退到本地解析模式。
+
+1. **获取API密钥**：访问 [DeepSeek官网](https://platform.deepseek.com/) 注册并获取API密钥
+2. **配置环境变量**：在 `.env` 文件中设置：
+   ```env
+   VITE_DEEPSEEK_API_KEY=your-api-key
+   VITE_DEEPSEEK_API_ENDPOINT=https://api.deepseek.com/v1/chat/completions
+   ```
+3. **重启应用**：配置完成后重启开发服务器
+
+### API功能
+- **自然语言解析**：将用户输入解析为结构化任务
+- **时间识别**：自动识别"明天"、"上午"、"下午"等时间表达
+- **优先级判断**：根据关键词自动设置任务优先级
+- **多任务解析**：支持一次输入多个任务
 
 ## 🔮 未来规划
 

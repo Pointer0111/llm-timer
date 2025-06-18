@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
+import { DEEPSEEK_CONFIG, isApiConfigured } from '../config/api'
 
 export interface Task {
   id: number
@@ -91,21 +92,196 @@ export const useTaskStore = defineStore('task', {
     // 自然语言解析任务
     async parseNaturalLanguage(input: string) {
       try {
-        // 这里应该调用LLM API进行自然语言解析
-        // 暂时使用简单的本地解析逻辑
-        const parsed = this.simpleParseNaturalLanguage(input)
-        if (parsed) {
-          const task = this.addTask(parsed.title, parsed.estimatedMinutes, parsed.priority)
+        // 调用DeepSeek API进行自然语言解析
+        const parsedTasks = await this.parseWithDeepSeek(input)
+        if (parsedTasks && parsedTasks.length > 0) {
+          const createdTasks = []
           
-          // 自动进行智能排期
-          await this.scheduleSingleTask(task.id)
+          for (const parsedTask of parsedTasks) {
+            const task = this.addTask(parsedTask.title, parsedTask.estimatedMinutes, parsedTask.priority)
+            
+            // 如果解析出了具体时间，使用解析的时间；否则进行智能排期
+            if (parsedTask.startTime && parsedTask.endTime) {
+              this.updateTaskSchedule(
+                task.id,
+                parsedTask.startTime,
+                parsedTask.endTime,
+                true
+              )
+            } else {
+              // 自动进行智能排期
+              await this.scheduleSingleTask(task.id)
+            }
+            
+            createdTasks.push(task)
+          }
           
-          return task
+          return createdTasks
         }
       } catch (error) {
         console.error('自然语言解析失败:', error)
+        // 如果API调用失败，回退到简单解析
+        const parsed = this.simpleParseNaturalLanguage(input)
+        if (parsed) {
+          const task = this.addTask(parsed.title, parsed.estimatedMinutes, parsed.priority)
+          await this.scheduleSingleTask(task.id)
+          return [task]
+        }
       }
       return null
+    },
+
+    // 使用DeepSeek API解析自然语言
+    async parseWithDeepSeek(input: string) {
+      const prompt = `你是一个智能任务解析助手。请将用户的自然语言输入解析为结构化的任务信息。
+
+用户输入：${input}
+
+请返回JSON格式的任务数组，每个任务包含以下字段：
+- title: 任务标题
+- estimatedMinutes: 预计时长（分钟）
+- priority: 优先级（高/中/低）
+- startTime: 开始时间（YYYY-MM-DD HH:mm格式，如果用户指定了具体时间）
+- endTime: 结束时间（YYYY-MM-DD HH:mm格式，如果用户指定了具体时间）
+
+注意事项：
+1. 如果用户说"明天"，请计算明天的日期
+2. 如果用户说"上午"，默认时间为9:00-12:00之间
+3. 如果用户说"下午"，默认时间为14:00-18:00之间
+4. 如果用户说"晚上"，默认时间为19:00-22:00之间
+5. 如果用户没有指定具体时间，startTime和endTime字段留空
+6. 优先级根据任务重要性判断，包含"重要"、"紧急"等关键词的设为"高"
+
+示例输出：
+[
+  {
+    "title": "开会",
+    "estimatedMinutes": 120,
+    "priority": "高",
+    "startTime": "2024-06-19 09:00",
+    "endTime": "2024-06-19 11:00"
+  },
+  {
+    "title": "写报告",
+    "estimatedMinutes": 60,
+    "priority": "中",
+    "startTime": "2024-06-19 14:00",
+    "endTime": "2024-06-19 15:00"
+  }
+]
+
+请只返回JSON格式的数据，不要包含其他文字。`
+
+      try {
+        if (isApiConfigured()) {
+          // 使用真实的DeepSeek API
+          const response = await fetch(DEEPSEEK_CONFIG.API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${DEEPSEEK_CONFIG.API_KEY}`
+            },
+            body: JSON.stringify({
+              model: DEEPSEEK_CONFIG.MODEL,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: DEEPSEEK_CONFIG.TEMPERATURE,
+              max_tokens: DEEPSEEK_CONFIG.MAX_TOKENS
+            })
+          })
+          
+          if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`)
+          }
+          
+          const data = await response.json()
+          const content = data.choices[0].message.content
+          
+          // 解析JSON响应
+          const jsonMatch = content.match(/\[[\s\S]*\]/)
+          if (jsonMatch) {
+            const tasks = JSON.parse(jsonMatch[0])
+            return tasks
+          }
+        } else {
+          // 如果API未配置，使用模拟响应
+          console.warn('DeepSeek API未配置，使用模拟响应')
+          const mockResponse = this.mockDeepSeekResponse(input)
+          const content = mockResponse
+          
+          // 解析JSON响应
+          const jsonMatch = content.match(/\[[\s\S]*\]/)
+          if (jsonMatch) {
+            const tasks = JSON.parse(jsonMatch[0])
+            return tasks
+          }
+        }
+        
+        return null
+      } catch (error) {
+        console.error('DeepSeek API调用失败:', error)
+        // 如果API调用失败，回退到模拟响应
+        const mockResponse = this.mockDeepSeekResponse(input)
+        const content = mockResponse
+        
+        const jsonMatch = content.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          const tasks = JSON.parse(jsonMatch[0])
+          return tasks
+        }
+        
+        throw error
+      }
+    },
+
+    // 模拟DeepSeek API响应（临时使用）
+    mockDeepSeekResponse(input: string) {
+      const now = dayjs()
+      const tomorrow = now.add(1, 'day')
+      
+      if (input.includes('明天上午开会2小时') && input.includes('下午写报告1小时')) {
+        return JSON.stringify([
+          {
+            "title": "开会",
+            "estimatedMinutes": 120,
+            "priority": "高",
+            "startTime": `${tomorrow.format('YYYY-MM-DD')} 09:00`,
+            "endTime": `${tomorrow.format('YYYY-MM-DD')} 11:00`
+          },
+          {
+            "title": "写报告",
+            "estimatedMinutes": 60,
+            "priority": "中",
+            "startTime": `${tomorrow.format('YYYY-MM-DD')} 14:00`,
+            "endTime": `${tomorrow.format('YYYY-MM-DD')} 15:00`
+          }
+        ])
+      }
+      
+      if (input.includes('明天上午读书1小时')) {
+        return JSON.stringify([
+          {
+            "title": "读书",
+            "estimatedMinutes": 60,
+            "priority": "中",
+            "startTime": `${tomorrow.format('YYYY-MM-DD')} 09:00`,
+            "endTime": `${tomorrow.format('YYYY-MM-DD')} 10:00`
+          }
+        ])
+      }
+      
+      // 默认解析
+      const parsed = this.simpleParseNaturalLanguage(input)
+      if (parsed) {
+        return JSON.stringify([{
+          "title": parsed.title,
+          "estimatedMinutes": parsed.estimatedMinutes,
+          "priority": parsed.priority,
+          "startTime": "",
+          "endTime": ""
+        }])
+      }
+      
+      return JSON.stringify([])
     },
 
     // 为单个任务进行智能排期

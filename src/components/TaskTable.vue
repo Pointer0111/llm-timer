@@ -84,20 +84,20 @@
           >
             排期
           </el-button>
-          <el-button
+        <el-button
             :type="row.isCompleted ? 'warning' : 'success'"
-            size="small"
-            @click="toggleTaskStatus(row.id)"
-          >
+          size="small"
+          @click="toggleTaskStatus(row.id)"
+        >
             {{ row.isCompleted ? '标记未完成' : '标记完成' }}
-          </el-button>
-          <el-button
-            type="danger"
-            size="small"
-            @click="deleteTask(row.id)"
-          >
-            删除
-          </el-button>
+        </el-button>
+        <el-button
+          type="danger"
+          size="small"
+          @click="deleteTask(row.id)"
+        >
+          删除
+        </el-button>
         </div>
       </template>
     </el-table-column>
@@ -279,7 +279,7 @@ const saveSchedule = () => {
   scheduleDialogVisible.value = false
   ElMessage.success('排期已保存')
 }
-</script>
+</script> 
 
 <style scoped>
 .task-title {

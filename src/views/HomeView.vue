@@ -98,7 +98,7 @@ onMounted(() => {
           <li><el-tag type="info">低优先级</el-tag>：不紧急的任务</li>
           <li><el-tag type="info">AI安排</el-tag>：由智能Agent自动安排的任务</li>
         </ul>
-      </div>
+    </div>
     </el-dialog>
   </div>
 </template>

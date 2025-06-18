@@ -105,6 +105,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { useTaskStore, type Task } from '../stores/task'
+import dayjs from 'dayjs'
 
 const taskStore = useTaskStore()
 const calendarRef = ref()
@@ -134,7 +135,15 @@ const calendarOptions = computed(() => ({
   slotMaxTime: '22:00:00',
   allDaySlot: false,
   slotDuration: '00:30:00',
-  slotLabelInterval: '01:00:00'
+  slotLabelInterval: '01:00:00',
+  snapDuration: '00:15:00', // 15分钟对齐
+  slotEventOverlap: false,
+  eventOverlap: false,
+  eventConstraint: {
+    startTime: '08:00',
+    endTime: '22:00',
+    dows: [0, 1, 2, 3, 4, 5, 6] // 允许所有天
+  }
 }))
 
 const getPriorityType = (priority: string) => {
@@ -194,10 +203,38 @@ const handleEventDrop = (info: any) => {
   const newStart = info.event.start
   const newEnd = info.event.end || new Date(newStart.getTime() + 60 * 60 * 1000) // 默认1小时
   
+  // 确保时间在合理范围内
+  const startHour = newStart.getHours()
+  const endHour = newEnd.getHours()
+  
+  if (startHour < 8 || endHour > 22) {
+    ElMessage.warning('任务时间必须在8:00-22:00之间')
+    // 回滚拖拽
+    info.revert()
+    return
+  }
+  
+  // 检查时间冲突
+  const hasConflict = taskStore.scheduledTasks.some(scheduledTask => {
+    if (scheduledTask.id === taskId || !scheduledTask.startTime || !scheduledTask.endTime) return false
+    
+    const scheduledStart = dayjs(scheduledTask.startTime)
+    const scheduledEnd = dayjs(scheduledTask.endTime)
+    
+    // 检查时间重叠
+    return (dayjs(newStart).isBefore(scheduledEnd) && dayjs(newEnd).isAfter(scheduledStart))
+  })
+  
+  if (hasConflict) {
+    ElMessage.warning('时间冲突，请选择其他时间段')
+    info.revert()
+    return
+  }
+  
   taskStore.updateTaskSchedule(
     taskId,
-    newStart.toISOString().slice(0, 16).replace('T', ' '),
-    newEnd.toISOString().slice(0, 16).replace('T', ' '),
+    dayjs(newStart).format('YYYY-MM-DD HH:mm'),
+    dayjs(newEnd).format('YYYY-MM-DD HH:mm'),
     false
   )
   
@@ -209,10 +246,37 @@ const handleEventResize = (info: any) => {
   const newStart = info.event.start
   const newEnd = info.event.end
   
+  // 确保时间在合理范围内
+  const startHour = newStart.getHours()
+  const endHour = newEnd.getHours()
+  
+  if (startHour < 8 || endHour > 22) {
+    ElMessage.warning('任务时间必须在8:00-22:00之间')
+    info.revert()
+    return
+  }
+  
+  // 检查时间冲突
+  const hasConflict = taskStore.scheduledTasks.some(scheduledTask => {
+    if (scheduledTask.id === taskId || !scheduledTask.startTime || !scheduledTask.endTime) return false
+    
+    const scheduledStart = dayjs(scheduledTask.startTime)
+    const scheduledEnd = dayjs(scheduledTask.endTime)
+    
+    // 检查时间重叠
+    return (dayjs(newStart).isBefore(scheduledEnd) && dayjs(newEnd).isAfter(scheduledStart))
+  })
+  
+  if (hasConflict) {
+    ElMessage.warning('时间冲突，请选择其他时间段')
+    info.revert()
+    return
+  }
+  
   taskStore.updateTaskSchedule(
     taskId,
-    newStart.toISOString().slice(0, 16).replace('T', ' '),
-    newEnd.toISOString().slice(0, 16).replace('T', ' '),
+    dayjs(newStart).format('YYYY-MM-DD HH:mm'),
+    dayjs(newEnd).format('YYYY-MM-DD HH:mm'),
     false
   )
   
