@@ -37,11 +37,13 @@ npm install
 
 ### 配置DeepSeek API（可选）
 1. 在项目根目录创建 `.env` 文件
-2. 添加以下配置：
-```env
-VITE_DEEPSEEK_API_KEY=your-deepseek-api-key-here
-VITE_DEEPSEEK_API_ENDPOINT=https://api.deepseek.com/v1/chat/completions
-```
+   - **Windows系统**：在PowerShell中运行以下命令：
+     ```powershell
+     echo VITE_DEEPSEEK_API_KEY=your-deepseek-api-key-here > .env
+     echo VITE_DEEPSEEK_API_ENDPOINT=https://api.deepseek.com/v1/chat/completions >> .env
+     ```
+   - **或者使用文件资源管理器**：右键 → 新建 → 文本文档，命名为 `.env`
+2. 将 `your-deepseek-api-key-here` 替换为您的实际API密钥
 
 ### 启动开发服务器
 ```bash
